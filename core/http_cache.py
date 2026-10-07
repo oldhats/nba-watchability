@@ -11,7 +11,7 @@ import requests
 
 
 def _default_cache_dir() -> str:
-    return os.getenv("NBA_WATCH_CACHE_DIR", os.path.join(os.getcwd(), ".cache"))
+    return os.getenv("NFL_WATCH_CACHE_DIR", os.path.join(os.getcwd(), ".cache"))
 
 
 def _ensure_dir(path: str) -> None:

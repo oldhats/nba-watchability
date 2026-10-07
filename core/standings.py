@@ -9,37 +9,24 @@ def _normalize_team_name(name: str) -> str:
     n = re.sub(r"[^a-z0-9\s]", "", n)
     n = re.sub(r"\s+", " ", n)
     # common aliases
-    n = n.replace("la clippers", "los angeles clippers")
-    n = n.replace("la lakers", "los angeles lakers")
-    n = n.replace("ny knicks", "new york knicks")
-    n = n.replace("gs warriors", "golden state warriors")
+    n = n.replace("la chargers", "los angeles chargers")
+    n = n.replace("la rams", "los angeles rams")
+    n = n.replace("ny giants", "new york giants")
+    n = n.replace("ny jets", "new york jets")
     return n
 
 def fetch_team_win_pct_map() -> Dict[str, float]:
     """
-    Returns dict mapping normalized team name -> win_pct (0..1).
-    Uses nba_api LeagueStandings endpoint.
+    Returns dict mapping normalized team name -> win_pct (0..1), from ESPN NFL standings.
     """
     try:
-        from nba_api.stats.endpoints import leaguestandings
-        ls = leaguestandings.LeagueStandings()
-        df = ls.get_data_frames()[0]
+        from core.standings_espn import fetch_team_win_pct_map as _espn
 
-        # Columns typically include: TeamName, WINS, LOSSES, WinPCT
-        out: Dict[str, float] = {}
-        for _, row in df.iterrows():
-            team_name = str(row.get("TeamName", "")).strip()
-            winpct = row.get("WinPCT", None)
-            if winpct is None:
-                # fallback compute
-                w = float(row.get("WINS", 0))
-                l = float(row.get("LOSSES", 0))
-                winpct = w / (w + l) if (w + l) > 0 else 0.5
-            out[_normalize_team_name(team_name)] = float(winpct)
-        return out
+        return _espn()
     except Exception:
-        # If nba_api fails (rate limits / endpoint quirks), fallback to neutral priors.
+        # Fallback to neutral priors.
         return {}
+
 
 def get_win_pct(team_name: str, winpct_map: Dict[str, float], default: float = 0.5) -> float:
     key = _normalize_team_name(team_name)

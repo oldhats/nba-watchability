@@ -15,7 +15,7 @@ import requests
 from dateutil import parser as dtparser
 from dateutil import tz
 
-from core.odds_api import fetch_nba_spreads_window
+from core.odds_api import fetch_nfl_spreads_window
 from core.schedule_espn import fetch_games_for_date
 from core.standings import _normalize_team_name, get_record, get_win_pct
 from core.standings_espn import fetch_team_standings_detail_maps
@@ -24,7 +24,6 @@ from core.health_espn import compute_team_player_impacts, injury_weight
 from core.importance import compute_importance_detail_map
 from core.watchability_v2_params import KEY_INJURY_IMPACT_SHARE_THRESHOLD, INJURY_OVERALL_IMPORTANCE_WEIGHT
 from core.build_watchability_df import build_watchability_df
-from core.build_watchability_forecast_df import build_watchability_forecast_df
 
 import core.watchability as watch
 
@@ -148,22 +147,10 @@ def _load_live_watchability_df(days_ahead: int = 7) -> pd.DataFrame:
     return build_watchability_df(days_ahead=days_ahead)
 
 
-@st.cache_data(ttl=60 * 60)  # 1h for 7d forecast supplement
 def _load_forecast_watchability_df(days_ahead: int = 7) -> pd.DataFrame:
-    # Try committed artifact first for speed/stability, then fallback to local build.
-    p_parquet = os.path.join("data", "forecast", "latest.parquet")
-    p_csv = os.path.join("data", "forecast", "latest.csv")
-    try:
-        if os.path.exists(p_parquet):
-            return pd.read_parquet(p_parquet)
-    except Exception:
-        pass
-    try:
-        if os.path.exists(p_csv):
-            return pd.read_csv(p_csv)
-    except Exception:
-        pass
-    return build_watchability_forecast_df(days_ahead=days_ahead)
+    # NFL: ESPN's scoreboard already lists the whole week with DraftKings lines, so the
+    # NBA version's model-based 7-day forecast isn't needed.
+    return pd.DataFrame()
 
 
 @st.cache_data(ttl=60 * 5)  # combined view refresh cadence
@@ -482,7 +469,7 @@ def inject_autorefresh(ms: int = 3_600_000) -> None:
 
 @st.cache_data(ttl=60 * 10)  # 10 min
 def load_games() -> list:
-    return fetch_nba_spreads_window(days_ahead=2)
+    return fetch_nfl_spreads_window(days_ahead=7)
 
 
 @st.cache_data(ttl=60 * 60)  # 1 hour
@@ -594,14 +581,14 @@ def _espn_gamecast_url(game_id) -> str:
         return ""
     if not gid.isdigit():
         return ""
-    return f"https://www.espn.com/nba/game/_/gameId/{gid}"
+    return f"https://www.espn.com/nfl/game/_/gameId/{gid}"
 
 
 def _watch_chip_html(where_url: str, provider: str) -> str:
     url = str(where_url or "").strip()
     if not url:
         return ""
-    provider_label = str(provider or "").strip() or "League Pass"
+    provider_label = str(provider or "").strip() or "Local TV"
     return (
         f"<span class='chip'><a href='{py_html.escape(url)}' target='_blank' rel='noopener noreferrer'>"
         f"Where to watch: {py_html.escape(provider_label)}</a></span>"
@@ -622,7 +609,7 @@ def _chips_for_row_html(row, *, wrap_in_divs: bool) -> str:
     chips: list[str] = []
     watch_chip = _watch_chip_html(
         str(row.get("Where to watch URL") or ""),
-        str(row.get("Where to watch provider") or "") or "League Pass",
+        str(row.get("Where to watch provider") or "") or "Local TV",
     )
     follow_chip = _follow_chip_html(row.get("ESPN game id"))
     if watch_chip:
@@ -660,9 +647,9 @@ def _parse_time_remaining(tr: str | None) -> tuple[int | None, int | None]:
 
 def _w2wn_live_boost(time_remaining: str | None, away_score: int | None, home_score: int | None) -> float:
     """
-    W2WN live boost:
-      - +3 in Q3 if score diff < 10
-      - +5 in Q4 if score diff < 10
+    W2WN live boost (NFL: "one-score game" = within 8):
+      - +3 in Q3 if score diff <= 8
+      - +5 in Q4/OT if score diff <= 8
     """
     q, _sec = _parse_time_remaining(time_remaining)
     if q is None:
@@ -673,7 +660,7 @@ def _w2wn_live_boost(time_remaining: str | None, away_score: int | None, home_sc
         diff = abs(int(away_score) - int(home_score))
     except Exception:
         return 0.0
-    if diff >= 10:
+    if diff > 8:
         return 0.0
     if q == 3:
         return 3.0
@@ -866,9 +853,9 @@ def render_recommendations_module(df: pd.DataFrame, *, slate_day: str | None, wr
 
         tip_text = _tip_pt_et(row)
         if tip_text:
-            tip_line = f"Tip {tip_text}"
+            tip_line = f"Kickoff {tip_text}"
         else:
-            tip_line = "Tip Unknown"
+            tip_line = "Kickoff TBD"
         tip_line = py_html.escape(tip_line)
 
         spread_label, spread_value = _spread_str(row)
@@ -1569,7 +1556,7 @@ def load_espn_game_injury_report_map(game_ids: tuple[str, ...]) -> dict[str, dic
         if not gid_s:
             continue
         try:
-            url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+            url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary"
             r = requests.get(url, params={"event": gid_s}, timeout=12)
             r.raise_for_status()
             data = r.json()
@@ -2087,11 +2074,11 @@ def _render_menu_row(r) -> str:
         dow = dt_pt.strftime("%a")
         pt_time = dt_pt.strftime("%I:%M%p").replace(" 0", " ").replace("AM", "am").replace("PM", "pm").lstrip("0")
         et_time = dt_et.strftime("%I:%M%p").replace("AM", "am").replace("PM", "pm").lstrip("0")
-        tip_line = f"Tip {dow} {pt_time} PT / {et_time} ET"
+        tip_line = f"Kickoff {dow} {pt_time} PT / {et_time} ET"
     else:
         tip_pt = str(r.get("Tip (PT)", "Unknown"))
         tip_et = str(r.get("Tip (ET)", "Unknown"))
-        tip_line = f"Tip {tip_pt} PT / {tip_et} ET"
+        tip_line = f"Kickoff {tip_pt} PT / {tip_et} ET"
     tip_line = py_html.escape(tip_line)
     where_html = _chips_for_row_html(r, wrap_in_divs=True)
     spread_label, spread_value = _spread_display_parts(r)
@@ -2175,7 +2162,7 @@ def render_table(
     *,
     selected_day: str | None = None,
 ) -> None:
-    sort_mode = st.segmented_control("Sort ↓", options=["Watchability", "Tip time"], default="Watchability")
+    sort_mode = st.segmented_control("Sort ↓", options=["Watchability", "Kickoff time"], default="Watchability")
     sort_mode = sort_mode or "Watchability"
     today_pt = dt.datetime.now(tz=tz.gettz("America/Los_Angeles")).date()
 
@@ -2236,7 +2223,7 @@ def render_table(
             and _normalize_team_name(str(r.get("Home team", ""))) in top_star_set,
             axis=1,
         )
-        if sort_mode == "Tip time" and "Tip dt (PT)" in day_df.columns:
+        if sort_mode == "Kickoff time" and "Tip dt (PT)" in day_df.columns:
             day_df = day_df.sort_values("Tip dt (PT)", ascending=True, na_position="last")
         else:
             day_df = day_df.sort_values("aWI", ascending=False)
@@ -2267,7 +2254,7 @@ def render_table(
                 and _normalize_team_name(str(r.get("Home team", ""))) in top_star_set,
                 axis=1,
             )
-            if sort_mode == "Tip time" and "Tip dt (PT)" in day_df.columns:
+            if sort_mode == "Kickoff time" and "Tip dt (PT)" in day_df.columns:
                 day_df = day_df.sort_values("Tip dt (PT)", ascending=True, na_position="last")
             else:
                 day_df = day_df.sort_values("aWI", ascending=False)
@@ -2292,7 +2279,7 @@ def render_table(
             lambda r: bool(r.get("_is_today_pt", False)) and _normalize_team_name(str(r.get("Home team", ""))) in top_star_set,
             axis=1,
         )
-        if sort_mode == "Tip time" and "Tip dt (PT)" in flat.columns:
+        if sort_mode == "Kickoff time" and "Tip dt (PT)" in flat.columns:
             flat = flat.sort_values("Tip dt (PT)", ascending=True, na_position="last")
         else:
             flat = flat.sort_values("aWI", ascending=False)
@@ -2309,7 +2296,7 @@ def render_full_dashboard(title: str, caption: str) -> None:
     info_text = (
         "How it works\n"
         "• Input 1 - Competitiveness: based on the spread (smaller spread = more competitive game).\n"
-        "• Input 2 - Team quality: average of team winning percentages adjusted for key injuries based on players output.\n"
+        "• Input 2 - Team quality: average of team winning percentages adjusted for injured starters (QB matters most).\n"
         "• Output: a single Watchability score + simple labels (Must Watch → Hard Skip).\n"
         "• Updates live: watchability changes as the score changes."
     )
@@ -2324,7 +2311,7 @@ def render_full_dashboard(title: str, caption: str) -> None:
 
     df, df_dates, date_options, date_to_label = build_dashboard_frames()
     if df.empty:
-        st.warning("No NBA regular season or playoff games found. Enjoy the break!")
+        st.warning("No NFL games found in the next week. Enjoy the break!")
         try:
             meta = {
                 "slate_day": None,
@@ -2417,7 +2404,7 @@ def render_chart_page() -> None:
     inject_base_css()
     df, _, date_options, date_to_label = build_dashboard_frames()
     if df.empty:
-        st.warning("No NBA regular season or playoff games found. Enjoy the break!")
+        st.warning("No NFL games found in the next week. Enjoy the break!")
         return
     selected = st.query_params.get("day")
     render_chart(
@@ -2434,6 +2421,6 @@ def render_table_page() -> None:
     inject_base_css()
     df, df_dates, date_options, _ = build_dashboard_frames()
     if df.empty:
-        st.warning("No NBA regular season or playoff games found. Enjoy the break!")
+        st.warning("No NFL games found in the next week. Enjoy the break!")
         return
     render_table(df=df, df_dates=df_dates, date_options=date_options, selected_day=None)

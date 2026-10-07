@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# Raw player impact = PTS + AST + REB (per game).
+# Raw player impact = depth-chart position weight for each starter (see core/health_espn.py).
 
 # Show "key injuries" only for high share-of-impact players.
 KEY_INJURY_IMPACT_SHARE_THRESHOLD = 0.1
@@ -24,7 +24,8 @@ INJURY_WEIGHT_OUT = 1.0
 STAR_DENOM = 50.0
 STAR_REB_WEIGHT = 0.7
 STAR_AST_WEIGHT = 0.7
-STAR_WINPCT_BUMP = 0.075
+# NFL: disabled. QB availability is already the biggest piece of team health.
+STAR_WINPCT_BUMP = 0.0
 
 # --- Importance ---
 

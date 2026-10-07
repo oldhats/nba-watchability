@@ -5,9 +5,9 @@ from typing import Any
 from core.http_cache import get_json_cached
 from dateutil import parser as dtparser
 
-ESPN_SCOREBOARD = (
-    "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-)
+from core.config import ESPN_NFL
+
+ESPN_SCOREBOARD = f"{ESPN_NFL}/scoreboard"
 
 def _format_live_clock(period, display_clock) -> str | None:
     """
@@ -37,11 +37,12 @@ def fetch_games_for_date(
     meta: dict[str, Any] | None = None,
 ):
     ymd = date.strftime("%Y%m%d")
-    url = f"{ESPN_SCOREBOARD}?dates={ymd}"
+    url = ESPN_SCOREBOARD
 
     cache_key = f"{cache_key_prefix}:{ymd}"
     resp = get_json_cached(
         url,
+        params={"dates": ymd},
         namespace="espn",
         cache_key=cache_key,
         ttl_seconds=int(ttl_seconds),

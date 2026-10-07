@@ -4,6 +4,12 @@ from typing import Dict, Optional
 
 from core.watchability_v2_params import IMPORTANCE_CEILING, IMPORTANCE_FLOOR
 
+# NFL: 7 playoff teams per conference, so the bubble sits between seeds 7 and 8.
+PLAYOFF_LAST_IN_SEED = 7
+# A team this many games (or more) from both its neighbors and the bubble has floor importance.
+# The NBA version used 10 games over an 82-game season; 17 games scales that to ~3.
+IMPORTANCE_RADIUS_GAMES = 3.0
+
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(float(lo), min(float(hi), float(x)))
@@ -16,9 +22,9 @@ def compute_importance_map(detail_map: Dict[str, dict]) -> Dict[str, float]:
     detail_map is expected to be keyed by normalized team name, with fields:
       - games_behind: float|None
       - playoff_seed: int|None   (conference seed)
-      - conference: 'east'|'west'|None
+      - conference: 'afc'|'nfc'|None
     """
-    by_conf: Dict[str, Dict[int, tuple[str, float]]] = {"east": {}, "west": {}}
+    by_conf: Dict[str, Dict[int, tuple[str, float]]] = {"afc": {}, "nfc": {}}
 
     for team, d in detail_map.items():
         conf = d.get("conference")
@@ -38,8 +44,8 @@ def compute_importance_map(detail_map: Dict[str, dict]) -> Dict[str, float]:
         if not seed_map:
             continue
 
-        seed6 = seed_map.get(6)
-        seed10 = seed_map.get(10)
+        seed_in = seed_map.get(PLAYOFF_LAST_IN_SEED)
+        seed_out = seed_map.get(PLAYOFF_LAST_IN_SEED + 1)
 
         for seed, (team, gb) in seed_map.items():
             gb_prev = seed_map.get(seed - 1, (None, None))[1] if (seed - 1) in seed_map else None
@@ -48,8 +54,8 @@ def compute_importance_map(detail_map: Dict[str, dict]) -> Dict[str, float]:
             seed_radius = _min_abs_delta(gb, gb_prev, gb_next)
             playoff_radius = _min_abs_delta(
                 gb,
-                seed6[1] if seed6 else None,
-                seed10[1] if seed10 else None,
+                seed_in[1] if seed_in else None,
+                seed_out[1] if seed_out else None,
             )
 
             if seed_radius is None or playoff_radius is None:
@@ -57,7 +63,7 @@ def compute_importance_map(detail_map: Dict[str, dict]) -> Dict[str, float]:
                 continue
 
             total_radius = max(0.0, float(seed_radius) + float(playoff_radius))
-            importance = (10.0 - total_radius) / 10.0
+            importance = (IMPORTANCE_RADIUS_GAMES - total_radius) / IMPORTANCE_RADIUS_GAMES
             out[team] = _clamp(importance, IMPORTANCE_FLOOR, IMPORTANCE_CEILING)
 
     # Anything missing defaults to the floor.
@@ -83,7 +89,7 @@ def compute_importance_detail_map(detail_map: Dict[str, dict]) -> Dict[str, dict
     Returns per-team detail:
       { team: { 'importance': float, 'seed_radius': float|None, 'playoff_radius': float|None } }
     """
-    by_conf: Dict[str, Dict[int, tuple[str, float]]] = {"east": {}, "west": {}}
+    by_conf: Dict[str, Dict[int, tuple[str, float]]] = {"afc": {}, "nfc": {}}
 
     for team, d in detail_map.items():
         conf = d.get("conference")
@@ -103,8 +109,8 @@ def compute_importance_detail_map(detail_map: Dict[str, dict]) -> Dict[str, dict
         if not seed_map:
             continue
 
-        seed6 = seed_map.get(6)
-        seed10 = seed_map.get(10)
+        seed_in = seed_map.get(PLAYOFF_LAST_IN_SEED)
+        seed_out = seed_map.get(PLAYOFF_LAST_IN_SEED + 1)
 
         for seed, (team, gb) in seed_map.items():
             gb_prev = seed_map.get(seed - 1, (None, None))[1] if (seed - 1) in seed_map else None
@@ -113,15 +119,15 @@ def compute_importance_detail_map(detail_map: Dict[str, dict]) -> Dict[str, dict
             seed_radius = _min_abs_delta(gb, gb_prev, gb_next)
             playoff_radius = _min_abs_delta(
                 gb,
-                seed6[1] if seed6 else None,
-                seed10[1] if seed10 else None,
+                seed_in[1] if seed_in else None,
+                seed_out[1] if seed_out else None,
             )
 
             if seed_radius is None or playoff_radius is None:
                 importance = float(IMPORTANCE_FLOOR)
             else:
                 total_radius = max(0.0, float(seed_radius) + float(playoff_radius))
-                importance = _clamp((10.0 - total_radius) / 10.0, IMPORTANCE_FLOOR, IMPORTANCE_CEILING)
+                importance = _clamp((IMPORTANCE_RADIUS_GAMES - total_radius) / IMPORTANCE_RADIUS_GAMES, IMPORTANCE_FLOOR, IMPORTANCE_CEILING)
 
             out[team] = {
                 "importance": float(importance),

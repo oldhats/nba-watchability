@@ -1,11 +1,34 @@
-# NBA Watchability
-https://nba-watchability.streamlit.app/
+# NFL Watchability
 
-https://x.com/NBAWhatToWatch
+An NFL fork of [NBA Watchability](https://github.com/cameronntaylor/nba-watchability) ([live NBA app](https://nba-watchability.streamlit.app/)). It uses the same model and dashboard, rewired for football.
 
-## Season-transition strategy
+## Run it
 
-- Through Oct. 19, odds come from The Odds API's `basketball_nba_preseason` competition and Team Quality is fixed at 40.
-- Beginning Oct. 20, odds use `basketball_nba`. Current-season injuries and the existing quality rules remain active.
-- For each team's first ten regular-season games, the Team Quality input is smoothed between its fully healthy prior-season baseline and its current-season adjusted win percentage. Current-season weight is `min(1, games_played / 10)`.
-- For the 2025-26 baseline, the champion New York Knicks receive Team Quality 100 and runner-up San Antonio Spurs receive 98.
+```bash
+pip install -r requirements.txt
+streamlit run app/streamlit_app.py
+```
+
+You don't need an API key. Games, DraftKings spreads, standings, injuries and depth charts all come from ESPN's public endpoints. If you set `ODDS_API_KEY`, spreads come from [The Odds API](https://the-odds-api.com) instead (median across books, sport `americanfootball_nfl`).
+
+## What changed from the NBA version
+
+| Piece | NBA | NFL |
+|---|---|---|
+| Games + spreads | The Odds API (key required) | ESPN scoreboard + DraftKings line, with The Odds API optional |
+| Team quality | Win % × injury health + star bump | Win % × injury health (star bump turned off) |
+| Player impact | PTS+REB+AST share of team | Depth-chart starters weighted by position (a QB is ~37% of a team) |
+| Injury statuses | Out / GTD with text parsing | Official Out / Doubtful / Questionable / IR report |
+| Importance | Seed + play-in radius over 10 games | Seed + playoff-bubble radius (7th/8th seed) over 3 games |
+| Blowout spread | 15 pts | 14 pts |
+| Live games | Live Odds API line | Live line if available, otherwise implied from score + time left |
+| Clock | 12-min quarters | 15-min quarters |
+| Forecast / X bot | 7-day model forecast, tweet bot | Removed (ESPN already lists the full week with lines) |
+
+The CES formula in `core/watchability.py` (70% quality, 30% closeness) is unchanged.
+
+## Deploy
+
+1. Push this repo to GitHub.
+2. Create an app at share.streamlit.io.
+3. Set the main file to `app/streamlit_app.py`.

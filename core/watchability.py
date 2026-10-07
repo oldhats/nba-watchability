@@ -6,7 +6,7 @@ from typing import Optional
 from core.watchability_v2_params import SIGMA
 
 # Best and worst possible spreads bunched
-SPREAD_CAP = 15
+SPREAD_CAP = 14  # NFL: two touchdowns is a blowout line
 SPREAD_MIN = 0.5
 
 # Best and worst possible win percentages bunched
