@@ -8,6 +8,6 @@ textColor = "#1F2229"
 
 [theme.dark]
 primaryColor = "#E0403B"
-backgroundColor = "#0E1117"
-secondaryBackgroundColor = "#1A1D24"
-textColor = "#FAFAFA"
+backgroundColor = "#1E2330"
+secondaryBackgroundColor = "#2A3040"
+textColor = "#F2F4F8"

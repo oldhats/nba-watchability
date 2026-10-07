@@ -17,15 +17,14 @@ import core.watchability as watch
 
 LOCAL_TZ = tz.gettz(LOCAL_TZ_NAME)
 
-# Must Watch -> Hard Skip: one red, fading out. A fade recedes toward the background in both
-# light and dark themes, so "more red = more watchable" holds either way.
+# Original NBA Watchability landscape colors.
 REGION_ORDER = ["Must Watch", "Strong Watch", "Watchable", "Skippable", "Hard Skip"]
 REGION_COLORS = {
-    "Must Watch": "rgba(224,64,59,1.0)",
-    "Strong Watch": "rgba(224,64,59,0.72)",
-    "Watchable": "rgba(224,64,59,0.48)",
-    "Skippable": "rgba(224,64,59,0.28)",
-    "Hard Skip": "rgba(224,64,59,0.12)",
+    "Must Watch": "#1f77b4",
+    "Strong Watch": "#2ca02c",
+    "Watchable": "#ff7f0e",
+    "Skippable": "#9467bd",
+    "Hard Skip": "#7f7f7f",
 }
 # Chart text that must read on white and on the dark background (~3.3:1 and ~5.7:1).
 CHART_INK = "#8a8f98"
@@ -90,7 +89,7 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 320px;
   white-space: normal;
-  background: #262730;
+  background: #12151c;
   color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
@@ -123,7 +122,7 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 340px;
   white-space: pre-line;
-  background: #262730;
+  background: #12151c;
   color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
@@ -170,7 +169,7 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 320px;
   white-space: normal;
-  background: #262730;
+  background: #12151c;
   color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
@@ -232,7 +231,7 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   width: 340px;
   white-space: pre-line;
-  background: #262730;
+  background: #12151c;
   color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
@@ -953,7 +952,7 @@ def render_chart(
 
     regions = (
         alt.Chart(regions_df)
-        .mark_rect(opacity=0.45)
+        .mark_rect(opacity=0.15)
         .encode(
             x=alt.X("q:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
             x2="q2:Q",
