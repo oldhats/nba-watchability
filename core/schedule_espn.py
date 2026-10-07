@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from core.http_cache import get_json_cached
-from dateutil import parser as dtparser
 
 from core.config import ESPN_NFL
 

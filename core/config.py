@@ -9,3 +9,6 @@ DEFAULT_REGIONS = "us"
 DEFAULT_MARKETS = "spreads"
 
 ESPN_NFL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl"
+
+# All kickoff times, day tabs and Sunday windows use Eastern time.
+LOCAL_TZ_NAME = "America/New_York"

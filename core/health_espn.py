@@ -1,8 +1,7 @@
 """
 NFL player impact + injury weights.
 
-The NBA version measured each player's impact as PTS+REB+AST per game. Football
-stats don't compare across positions, so the NFL version uses ESPN depth charts:
+Football stats don't compare across positions, so impact comes from ESPN depth charts:
 only listed starters count, and each starter's impact comes from a position weight
 (a QB is worth far more than a guard). A team's `impact_share` values sum to 1, so
 the rest of the pipeline (health = 1 - 0.6 * sum(injury_weight * share)) is unchanged.
@@ -83,12 +82,6 @@ class PlayerImpact:
     athlete_id: str
     name: str
     position: str
-    # Kept for compatibility with the NBA pipeline's star formula (always 0 for NFL).
-    points_per_game: float
-    assists_per_game: float
-    rebounds_per_game: float
-    steals_per_game: float
-    blocks_per_game: float
     raw_impact: float
     impact_share: float
     relative_raw_impact: float
@@ -174,11 +167,6 @@ def compute_team_player_impacts(team_name: str, *, season_year: Optional[int] = 
             athlete_id=aid,
             name=name,
             position=slot,
-            points_per_game=0.0,
-            assists_per_game=0.0,
-            rebounds_per_game=0.0,
-            steals_per_game=0.0,
-            blocks_per_game=0.0,
             raw_impact=float(w),
             impact_share=float(w) / total,
             relative_raw_impact=float(w) / top,

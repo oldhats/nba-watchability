@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -38,10 +39,19 @@ def _read_json(path: str) -> Optional[dict[str, Any]]:
 
 
 def _write_json(path: str, payload: dict[str, Any]) -> None:
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f)
-    os.replace(tmp, path)
+    """Best-effort atomic write. A unique temp file per writer keeps concurrent fetches of the
+    same key (e.g. every team thread loading the team-id map on a cold start) from colliding."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        os.replace(tmp, path)
+    except OSError:
+        # Another writer won the race (or holds the file on Windows); the fetched data is still good.
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
 
 
 @dataclass(frozen=True)

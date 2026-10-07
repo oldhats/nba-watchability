@@ -14,21 +14,16 @@ from dateutil import tz
 from core.health_espn import PlayerImpact, compute_team_player_impacts, injury_weight
 from core.http_cache import get_json_cached
 from core.importance import compute_importance_detail_map
-from core.config import ESPN_NFL
+from core.config import ESPN_NFL, LOCAL_TZ_NAME
 from core.odds_api import fetch_nfl_spreads_window
 from core.schedule_espn import fetch_games_for_date
 from core.standings import _normalize_team_name, get_record, get_win_pct
 from core.standings_espn import fetch_team_standings_detail_maps
 from core.team_meta import get_logo_url
-from core.team_meta import get_team_abbr
 from core.results_espn import extract_closing_spreads
 from core.watchability_v2_params import (
     INJURY_OVERALL_IMPORTANCE_WEIGHT,
     KEY_INJURY_IMPACT_SHARE_THRESHOLD,
-    STAR_AST_WEIGHT,
-    STAR_DENOM,
-    STAR_REB_WEIGHT,
-    STAR_WINPCT_BUMP,
 )
 
 import core.watchability as watch
@@ -145,10 +140,6 @@ def _normalize_status_for_display(status: str | None) -> str:
         return nfl_labels[s.upper()]
     if s.upper().startswith(("PUP", "PHYSICALLY UNABLE")):
         return "PUP"
-    if s.upper() == "GTD":
-        return "GTD"
-    if s.lower() in {"day-to-day", "day to day", "daytoday", "dtd"}:
-        return "GTD"
     return s
 
 
@@ -175,15 +166,15 @@ def _load_espn_game_map(local_dates_iso: list[str]) -> dict[tuple[str, str, str]
       - away_score (int|None)
       - time_remaining (str|None) e.g. '5:32 Q3'
 
-    Note: ESPN's scoreboard "dates=" is not always aligned with PT local dates for late games,
-    so we fetch an extra day window and map events back into PT dates.
+    Note: ESPN's scoreboard "dates=" is not always aligned with ET local dates for late games,
+    so we fetch an extra day window and map events back into ET dates.
     """
     out: dict[tuple[str, str, str], dict] = {}
     if not local_dates_iso:
         return out
 
     targets = set(str(x) for x in local_dates_iso)
-    local_tz = tz.gettz("America/Los_Angeles")
+    local_tz = tz.gettz(LOCAL_TZ_NAME)
 
     candidate_days = set()
     for iso in targets:
@@ -304,13 +295,8 @@ def _load_espn_league_injuries_by_team(*, ttl_seconds: int = 10 * 60) -> dict[st
             if isinstance(t, str) and t.strip():
                 return _normalize_status_for_display(t.strip()).upper()
 
-        # Fallback to the top-level status if fantasyStatus isn't present.
-        status = inj.get("status")
-        if isinstance(status, str) and status.strip():
-            return _normalize_status_for_display(status).upper()
-
-        # Safe default: treat unknowns as GTD.
-        return "GTD"
+        # No usable status: treat like "Active" (skipped below).
+        return "ACTIVE"
 
     out: dict[str, dict[str, dict[str, str]]] = {}
     for block in blocks:
@@ -553,10 +539,33 @@ def _extract_espn_broadcast_media_names(summary: dict[str, Any]) -> list[str]:
     return out
 
 
+# Sunday window order, used by the dashboard to group a Sunday slate.
+WINDOW_ORDER = ["Sunday Morning", "Sunday Early", "Sunday Late", "Sunday Night"]
+
+
+def kickoff_window(dt_et: dt.datetime | None) -> str:
+    """
+    Broadcast window for an ET kickoff: Sunday games split into Morning (international,
+    9:30am), Early (1:00pm), Late (4:05/4:25pm) and Night (SNF). Other days use the day
+    name, with "Night" added for prime-time kickoffs (7pm ET or later).
+    """
+    if dt_et is None:
+        return "TBD"
+    day = dt_et.strftime("%A")
+    if day == "Sunday":
+        if dt_et.hour < 12:
+            return "Sunday Morning"
+        if dt_et.hour < 15:
+            return "Sunday Early"
+        if dt_et.hour < 19:
+            return "Sunday Late"
+        return "Sunday Night"
+    return f"{day} Night" if dt_et.hour >= 19 else day
+
+
 def build_watchability_df(
     *,
     days_ahead: int = 7,
-    tz_name: str = "America/Los_Angeles",
     include_post: bool = False,
 ) -> pd.DataFrame:
     """
@@ -566,8 +575,7 @@ def build_watchability_df(
     winpct_map, record_map, detail_map = fetch_team_standings_detail_maps()
     importance_detail = compute_importance_detail_map(detail_map)
 
-    local_tz = tz.gettz(tz_name)
-    et_tz = tz.gettz("America/New_York")
+    local_tz = tz.gettz(LOCAL_TZ_NAME)
 
     team_names = sorted({g.home_team for g in games} | {g.away_team for g in games})
     # Compute player impact shares lazily only for teams that have injuries in a specific matchup.
@@ -599,35 +607,30 @@ def build_watchability_df(
 
         abs_spread = None if g.home_spread is None else abs(float(g.home_spread))
 
-        dt_et = None
+        dt_utc = None
+        dt_local = None
+        local_date = None
+        day_name = "Unknown"
+        kickoff_text = "Unknown"
+        kickoff_short = "?"
         if g.commence_time_utc:
             dt_utc = dtparser.isoparse(g.commence_time_utc)
             dt_utc = dt_utc.astimezone(dt.timezone.utc) if dt_utc.tzinfo else dt_utc.replace(tzinfo=dt.timezone.utc)
-            dt_local = dt_utc.astimezone(local_tz) if local_tz else dt_utc
-            dt_et = dt_utc.astimezone(et_tz) if et_tz else None
+            dt_local = dt_utc.astimezone(local_tz)
             local_date = dt_local.date()
             day_name = dt_local.strftime("%A")
-            tip_local = dt_local.strftime("%a %I:%M %p")
-            tip_short = dt_local.strftime("%a %I%p").replace(" 0", " ")
-            tip_et = dt_et.strftime("%a %I:%M %p") if dt_et else "Unknown"
-        else:
-            dt_local = None
-            local_date = None
-            day_name = "Unknown"
-            tip_local = "Unknown"
-            tip_short = "?"
-            tip_et = "Unknown"
+            kickoff_text = dt_local.strftime("%a %I:%M %p").replace(" 0", " ")
+            kickoff_short = dt_local.strftime("%a %I:%M%p").replace(" 0", " ").replace(":00", "")
 
         rows.append(
             {
-                "Tip (PT)": tip_local,
-                "Tip (ET)": tip_et,
-                "Tip short": tip_short,
-                "Tip dt (PT)": dt_local,
-                "Tip dt (ET)": dt_et,
-                "Tip dt (UTC)": dt_utc,
+                "Kickoff (ET)": kickoff_text,
+                "Kickoff short": kickoff_short,
+                "Kickoff dt (ET)": dt_local,
+                "Kickoff dt (UTC)": dt_utc,
                 "Local date": local_date,
                 "Day": day_name,
+                "Window": kickoff_window(dt_local),
                 "Matchup": f"{g.away_team} @ {g.home_team}",
                 "Away team": g.away_team,
                 "Home team": g.home_team,
@@ -700,10 +703,9 @@ def build_watchability_df(
 
     df["Is live"] = df["Status"] == "in"
 
-    def _tip_display(r) -> str:
+    def _kickoff_display(r) -> str:
         if not bool(r["Is live"]):
-            tip = str(r["Tip short"])
-            return tip if "PT" in tip else f"{tip} PT"
+            return f"{r['Kickoff short']} ET"
         away = r.get("Away score")
         home = r.get("Home score")
         tr = r.get("Time remaining")
@@ -711,7 +713,7 @@ def build_watchability_df(
             return f"🚨 LIVE{(' ' + str(tr)) if tr else ''}"
         return f"🚨 {int(away)}-{int(home)}{(' ' + str(tr)) if tr else ''}"
 
-    df["Tip display"] = df.apply(_tip_display, axis=1)
+    df["Kickoff display"] = df.apply(_kickoff_display, axis=1)
 
     if not include_post:
         df = df[df["Status"] != "post"].copy()
@@ -847,11 +849,8 @@ def build_watchability_df(
         if isinstance(by_id, dict) and by_id:
             teams_with_injuries.add(str(team_key))
 
-    # Star/top-scorer map needed for all teams; compute impacts once per team (cached per-athlete stats).
-    # Keep this parallelized and rely on the disk HTTP cache to make warm loads fast.
-    star_workers = int(os.getenv("NFL_WATCH_STAR_WORKERS", "8"))
-    # team_key -> (athlete_id, name, star_raw, star_sum)
-    top_scorer: dict[str, tuple[str, str, float, float]] = {}
+    # Depth-chart starters for every team; parallelized, with the disk HTTP cache keeping warm loads fast.
+    team_workers = int(os.getenv("NFL_WATCH_TEAM_WORKERS", "8"))
 
     def _fetch_team(team_key: str, team_name: str) -> tuple[str, list[PlayerImpact]]:
         try:
@@ -859,55 +858,14 @@ def build_watchability_df(
         except Exception:
             return team_key, []
 
-    with cf.ThreadPoolExecutor(max_workers=star_workers) as ex:
+    with cf.ThreadPoolExecutor(max_workers=team_workers) as ex:
         futures = [
             ex.submit(_fetch_team, team_key, team_name_by_key.get(team_key, team_key))
             for team_key in sorted(team_name_by_key.keys())
         ]
         for fut in cf.as_completed(futures):
             k, players = fut.result()
-            # Keep the full list for robust injury matching and logging.
             team_impacts[k] = players
-            if players:
-                def _star_sum(pl: PlayerImpact) -> float:
-                    return (
-                        float(pl.points_per_game)
-                        + float(STAR_REB_WEIGHT) * float(pl.rebounds_per_game)
-                        + float(STAR_AST_WEIGHT) * float(pl.assists_per_game)
-                        + float(pl.steals_per_game)
-                        + float(pl.blocks_per_game)
-                    )
-
-                best = max(players, key=_star_sum)
-                ssum = _star_sum(best)
-                denom = float(STAR_DENOM) if float(STAR_DENOM) else 1.0
-                sraw = float(ssum) / denom
-                sraw = sraw * sraw * sraw
-                top_scorer[k] = (best.athlete_id, best.name, sraw, ssum)
-
-    def _status_priority(status: str) -> int:
-        s = (status or "").strip().lower()
-        if "out" in s or "injur" in s:
-            return 3
-        if "doubt" in s:
-            return 2
-        if "question" in s or s in {"gtd", "dtd", "day-to-day", "day to day", "game-time decision", "game time decision"}:
-            return 1
-        return 0
-
-    def _worst_status(a: str | None, b: str | None) -> str | None:
-        if not a and not b:
-            return None
-        if not a:
-            return b
-        if not b:
-            return a
-        return a if _status_priority(a) >= _status_priority(b) else b
-
-    def _weight_for_abbr_with_short_comment(*, abbr: str | None, short_comment: str | None, target_dow: str | None) -> float:
-        # NFL injury reports use explicit statuses (Out / Doubtful / Questionable / IR),
-        # so no need to infer from the comment text like the NBA "GTD" label.
-        return float(injury_weight(abbr or ""))
 
     def _merged_team_status_map(
         team_key: str,
@@ -944,7 +902,7 @@ def build_watchability_df(
                     merged[pid] = str(st)
         return merged
 
-    def _team_key_injuries_and_health(team_key: str, game_id: str | None, *, target_dow: str | None) -> tuple[float, str, str]:
+    def _team_key_injuries_and_health(team_key: str, game_id: str | None) -> tuple[float, str, str]:
         players = team_impacts.get(team_key, []) or []
         by_team = _merged_team_status_map(team_key, game_id, players=players)
         payload = (league_injuries_by_team or {}).get(team_key, {}) or {}
@@ -955,8 +913,6 @@ def build_watchability_df(
 
         impact_by_id: dict[str, PlayerImpact] = {str(p.athlete_id): p for p in players}
         impact_by_norm_name: dict[str, PlayerImpact] = {_normalize_player_name(p.name): p for p in players if _normalize_player_name(p.name)}
-        top = top_scorer.get(team_key)
-        top_athlete_id = str(top[0]) if top else ""
 
         penalty = 0.0
         injured_players: list[tuple[float, float, str, str, str]] = []
@@ -966,14 +922,12 @@ def build_watchability_df(
             pid_str = str(pid)
             st_norm = _normalize_status_for_display(str(st) if st is not None else None).upper()
             st_display = _normalize_status_for_display(st_norm)
-            sc = None
             inj_name = ""
             if isinstance(detail_by_id, dict):
                 det = detail_by_id.get(pid_str)
                 if isinstance(det, dict):
-                    sc = det.get("shortComment")
                     inj_name = str(det.get("name") or "")
-            w = _weight_for_abbr_with_short_comment(abbr=st_norm, short_comment=sc, target_dow=target_dow)
+            w = float(injury_weight(st_norm))
 
             p = impact_by_id.get(pid_str)
             if p is None and inj_name:
@@ -1019,9 +973,7 @@ def build_watchability_df(
         injured_players.sort(key=lambda x: x[0], reverse=True)
         key_injuries: list[str] = []
         for raw, share, pid_str, name, st_display in injured_players:
-            is_key = float(share) >= KEY_INJURY_IMPACT_SHARE_THRESHOLD
-            is_top_out = bool(top_athlete_id) and pid_str == top_athlete_id and _status_priority(st_display) >= 3
-            if is_key or is_top_out:
+            if float(share) >= KEY_INJURY_IMPACT_SHARE_THRESHOLD:
                 key_injuries.append(f"{name} ({st_display})")
 
         total_delta = sum(float(d["health_delta"]) for d in detail if d.get("health_delta") is not None)
@@ -1041,143 +993,44 @@ def build_watchability_df(
         detail_json = json.dumps(detail, ensure_ascii=False)
         return health, ", ".join(key_injuries), detail_json
 
-    injury_info_cache: dict[tuple[str, str, str], tuple[float, str, str]] = {}
+    injury_info_cache: dict[tuple[str, str], tuple[float, str, str]] = {}
 
-    def _memo_team_injury_info(team_key: str, game_id: str | None, target_dow: str | None) -> tuple[float, str, str]:
-        k = (team_key, str(game_id or ""), str(target_dow or ""))
+    def _memo_team_injury_info(team_key: str, game_id: str | None) -> tuple[float, str, str]:
+        k = (team_key, str(game_id or ""))
         if k in injury_info_cache:
             return injury_info_cache[k]
-        v = _team_key_injuries_and_health(team_key, game_id, target_dow=target_dow)
+        v = _team_key_injuries_and_health(team_key, game_id)
         injury_info_cache[k] = v
         return v
 
     df["Health (away)"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"), r.get("Day"))[0],
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"))[0],
         axis=1,
     )
     df["Health (home)"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"), r.get("Day"))[0],
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"))[0],
         axis=1,
     )
     df["Away Key Injuries"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"), r.get("Day"))[1] or "",
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"))[1] or "",
         axis=1,
     )
     df["Home Key Injuries"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"), r.get("Day"))[1] or "",
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"))[1] or "",
         axis=1,
     )
     df["Away injuries detail JSON"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"), r.get("Day"))[2] or "[]",
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Away team"]), r.get("ESPN game id"))[2] or "[]",
         axis=1,
     )
     df["Home injuries detail JSON"] = df.apply(
-        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"), r.get("Day"))[2] or "[]",
+        lambda r: _memo_team_injury_info(_normalize_team_name(r["Home team"]), r.get("ESPN game id"))[2] or "[]",
         axis=1,
     )
 
 
-    # Baseline adjusted win% prior to star bump (health-adjusted only).
     df["Adj win% (away)"] = df["Win% (away raw)"].astype(float) * df["Health (away)"].astype(float)
     df["Adj win% (home)"] = df["Win% (home raw)"].astype(float) * df["Health (home)"].astype(float)
-    df["Adj win% (away) pre-star"] = df["Adj win% (away)"].astype(float)
-    df["Adj win% (home) pre-star"] = df["Adj win% (home)"].astype(float)
-    df["Avg adj win% pre-star"] = 0.5 * (df["Adj win% (away) pre-star"] + df["Adj win% (home) pre-star"])
-
-    def _star_factor(team_key: str, game_id: str | None, target_dow: str | None) -> float:
-        top = top_scorer.get(team_key)
-        if not top:
-            return 0.0
-        athlete_id, _, star_raw, _ = top
-        merged = _merged_team_status_map(team_key, game_id, players=team_impacts.get(team_key, []) or [])
-        abbr = merged.get(str(athlete_id))
-        payload = (league_injuries_by_team or {}).get(team_key, {}) or {}
-        detail_by_id = payload.get("detail_by_id") if isinstance(payload, dict) else {}
-        sc = None
-        if isinstance(detail_by_id, dict):
-            det = detail_by_id.get(str(athlete_id))
-            if isinstance(det, dict):
-                sc = det.get("shortComment")
-        w = _weight_for_abbr_with_short_comment(abbr=str(abbr) if abbr is not None else None, short_comment=sc, target_dow=target_dow)
-        availability = max(0.0, 1.0 - float(w))
-        return float(STAR_WINPCT_BUMP) * float(star_raw) * availability
-
-    def _star_player_name(team_key: str) -> str:
-        top = top_scorer.get(team_key)
-        if not top:
-            return ""
-        _, name, _, _ = top
-        return str(name)
-
-    def _star_player_raw(team_key: str) -> float:
-        top = top_scorer.get(team_key)
-        if not top:
-            return 0.0
-        _, _, star_raw, _ = top
-        return float(star_raw)
-
-    df["Star factor (away)"] = df.apply(
-        lambda r: _star_factor(_normalize_team_name(r["Away team"]), r.get("ESPN game id"), r.get("Day")),
-        axis=1,
-    )
-    df["Star factor (home)"] = df.apply(
-        lambda r: _star_factor(_normalize_team_name(r["Home team"]), r.get("ESPN game id"), r.get("Day")),
-        axis=1,
-    )
-    df["Away Star Player"] = df.apply(lambda r: _star_player_name(_normalize_team_name(r["Away team"])), axis=1)
-    df["Home Star Player"] = df.apply(lambda r: _star_player_name(_normalize_team_name(r["Home team"])), axis=1)
-    df["Away Star Raw"] = df.apply(lambda r: _star_player_raw(_normalize_team_name(r["Away team"])), axis=1)
-    df["Home Star Raw"] = df.apply(lambda r: _star_player_raw(_normalize_team_name(r["Home team"])), axis=1)
-
-    # Add star factor as a small additive bump to win% (then clip to [0,1]).
-    df["Adj win% (away)"] = (df["Adj win% (away)"].astype(float) + df["Star factor (away)"].astype(float)).clip(0.0, 1.0)
-    df["Adj win% (home)"] = (df["Adj win% (home)"].astype(float) + df["Star factor (home)"].astype(float)).clip(0.0, 1.0)
-    df["Avg adj win% post-star"] = 0.5 * (df["Adj win% (away)"] + df["Adj win% (home)"])
-
-    # Convert star bumps into the same units as the displayed "Team Quality" component (0..1 then scaled to 0..100).
-    def _quality_bumps_row(r) -> pd.Series:
-        away_pre = float(r.get("Adj win% (away) pre-star") or 0.0)
-        home_pre = float(r.get("Adj win% (home) pre-star") or 0.0)
-        away_sf = float(r.get("Star factor (away)") or 0.0)
-        home_sf = float(r.get("Star factor (home)") or 0.0)
-
-        q_pre = float(watch.team_quality(home_pre, away_pre))
-
-        away_only = min(1.0, away_pre + away_sf)
-        home_only = min(1.0, home_pre + home_sf)
-        dq_away = float(watch.team_quality(home_pre, away_only)) - q_pre
-        dq_home = float(watch.team_quality(home_only, away_pre)) - q_pre
-        return pd.Series(
-            {
-                "Team quality pre-star": q_pre,
-                "Team Quality bump (away)": 100.0 * dq_away,
-                "Team Quality bump (home)": 100.0 * dq_home,
-            }
-        )
-
-    df[["Team quality pre-star", "Team Quality bump (away)", "Team Quality bump (home)"]] = df.apply(
-        _quality_bumps_row, axis=1
-    )
-
-    def _star_factor_display(name: str, bump_points: float) -> str:
-        if not name:
-            return ""
-        try:
-            b = float(bump_points)
-        except Exception:
-            b = 0.0
-        if b <= 0:
-            return ""
-        return f"{name} +{int(round(b))} TQ"
-
-    df["Away Star Factor"] = df.apply(
-        lambda r: _star_factor_display(str(r.get("Away Star Player") or ""), float(r.get("Team Quality bump (away)") or 0.0)),
-        axis=1,
-    )
-    df["Home Star Factor"] = df.apply(
-        lambda r: _star_factor_display(str(r.get("Home Star Player") or ""), float(r.get("Team Quality bump (home)") or 0.0)),
-        axis=1,
-    )
 
     def _compute_watchability_row(r) -> pd.Series:
         abs_spread = r.get("|spread effective|")
@@ -1202,15 +1055,3 @@ def build_watchability_df(
     df = df.sort_values("aWI", ascending=False).reset_index(drop=True)
     return df
 
-
-def build_watchability_sources_summary(df: pd.DataFrame) -> str:
-    """
-    Optional sources blob for logging.
-    """
-    spread_sources = sorted({str(x) for x in df.get("Spread source", pd.Series(dtype=str)).dropna().tolist()})
-    payload = {
-        "odds_sources": spread_sources,
-        "injuries_source": "ESPN league injuries + summary fallback",
-        "generated_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-    }
-    return json.dumps(payload, sort_keys=True)

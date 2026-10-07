@@ -16,7 +16,7 @@ You don't need an API key. Games, DraftKings spreads, standings, injuries and de
 | Piece | NBA | NFL |
 |---|---|---|
 | Games + spreads | The Odds API (key required) | ESPN scoreboard + DraftKings line, with The Odds API optional |
-| Team quality | Win % × injury health + star bump | Win % × injury health (star bump turned off) |
+| Team quality | Win % × injury health + star bump | Win % × injury health (no star bump) |
 | Player impact | PTS+REB+AST share of team | Depth-chart starters weighted by position (a QB is ~37% of a team) |
 | Injury statuses | Out / GTD with text parsing | Official Out / Doubtful / Questionable / IR report |
 | Importance | Seed + play-in radius over 10 games | Seed + playoff-bubble radius (7th/8th seed) over 3 games |
@@ -24,6 +24,8 @@ You don't need an API key. Games, DraftKings spreads, standings, injuries and de
 | Live games | Live Odds API line | Live line if available, otherwise implied from score + time left |
 | Clock | 12-min quarters | 15-min quarters |
 | Forecast / X bot | 7-day model forecast, tweet bot | Removed (ESPN already lists the full week with lines) |
+| Times | Pacific | Eastern; Sunday games grouped by window (morning / early / late / night) |
+| Theme | Light | Dark with red accents (`.streamlit/config.toml`) |
 
 The CES formula in `core/watchability.py` (70% quality, 30% closeness) is unchanged.
 

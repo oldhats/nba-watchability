@@ -17,16 +17,6 @@ INJURY_WEIGHT_QUESTIONABLE = 0.4
 INJURY_WEIGHT_DOUBTFUL = 0.7
 INJURY_WEIGHT_OUT = 1.0
 
-# --- Star player bump (small additive win% boost) ---
-
-# star_raw = ((PPG + STAR_REB_WEIGHT*REB + STAR_AST_WEIGHT*AST + STL + BLK) / STAR_DENOM)**2
-# star_factor = STAR_WINPCT_BUMP * star_raw * (1 - injury_weight(status))
-STAR_DENOM = 50.0
-STAR_REB_WEIGHT = 0.7
-STAR_AST_WEIGHT = 0.7
-# NFL: disabled. QB availability is already the biggest piece of team health.
-STAR_WINPCT_BUMP = 0.0
-
 # --- Importance ---
 
 IMPORTANCE_FLOOR = 0.1

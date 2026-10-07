@@ -7,7 +7,7 @@ from core.watchability_v2_params import IMPORTANCE_CEILING, IMPORTANCE_FLOOR
 # NFL: 7 playoff teams per conference, so the bubble sits between seeds 7 and 8.
 PLAYOFF_LAST_IN_SEED = 7
 # A team this many games (or more) from both its neighbors and the bubble has floor importance.
-# The NBA version used 10 games over an 82-game season; 17 games scales that to ~3.
+# Scaled for a 17-game season.
 IMPORTANCE_RADIUS_GAMES = 3.0
 
 
