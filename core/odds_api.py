@@ -129,6 +129,12 @@ def _fetch_espn_window(days_ahead: int, start_utc: dt.datetime, end_utc: dt.date
     return list(games.values())
 
 
+# The Odds API is metered (1 credit per call). One shared, stable-keyed cache entry means at most
+# one call per 30 minutes across all viewers; spreads are matched onto ESPN's games by team
+# name, so a slightly older response is fine.
+ODDS_API_TTL_SECONDS = 30 * 60
+
+
 def _fetch_odds_api_window(start_utc: dt.datetime, end_utc: dt.datetime, days_ahead: int) -> List[GameOdds]:
     url = f"{ODDS_BASE_URL}/sports/{SPORT_KEY_NFL}/odds"
     base_params = {
@@ -148,8 +154,8 @@ def _fetch_odds_api_window(start_utc: dt.datetime, end_utc: dt.datetime, days_ah
             url,
             params=params_with_window,
             namespace="odds_api",
-            cache_key=f"nfl_odds_window:{days_ahead}:{start_utc.isoformat()}:{end_utc.isoformat()}",
-            ttl_seconds=5 * 60,
+            cache_key=f"nfl_odds_window:{days_ahead}",
+            ttl_seconds=ODDS_API_TTL_SECONDS,
             timeout_seconds=20,
         )
         data = resp.data
@@ -161,7 +167,7 @@ def _fetch_odds_api_window(start_utc: dt.datetime, end_utc: dt.datetime, days_ah
             params=base_params,
             namespace="odds_api",
             cache_key="nfl_odds_unfiltered",
-            ttl_seconds=5 * 60,
+            ttl_seconds=ODDS_API_TTL_SECONDS,
             timeout_seconds=20,
         )
         data = resp.data

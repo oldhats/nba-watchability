@@ -17,15 +17,18 @@ import core.watchability as watch
 
 LOCAL_TZ = tz.gettz(LOCAL_TZ_NAME)
 
-# Must Watch -> Hard Skip: one red hue, brightest = most watchable (validated for the dark surface).
+# Must Watch -> Hard Skip: one red, fading out. A fade recedes toward the background in both
+# light and dark themes, so "more red = more watchable" holds either way.
 REGION_ORDER = ["Must Watch", "Strong Watch", "Watchable", "Skippable", "Hard Skip"]
 REGION_COLORS = {
-    "Must Watch": "#ffa39c",
-    "Strong Watch": "#f86b63",
-    "Watchable": "#e0403b",
-    "Skippable": "#b0302c",
-    "Hard Skip": "#842724",
+    "Must Watch": "rgba(224,64,59,1.0)",
+    "Strong Watch": "rgba(224,64,59,0.72)",
+    "Watchable": "rgba(224,64,59,0.48)",
+    "Skippable": "rgba(224,64,59,0.28)",
+    "Hard Skip": "rgba(224,64,59,0.12)",
 }
+# Chart text that must read on white and on the dark background (~3.3:1 and ~5.7:1).
+CHART_INK = "#8a8f98"
 
 
 def _normalize_dashboard_df_types(df: pd.DataFrame) -> pd.DataFrame:
@@ -58,11 +61,11 @@ div[data-testid="collapsedControl"] {display: none;}
 .menu-row {display:flex; align-items:center; gap:12px;}
 .menu-awi {width:110px;}
 .menu-awi .score {font-size: 14px; font-weight: 650; line-height: 1.15; word-break: break-word;}
-.menu-awi .subscores {margin-top: 2px; font-size: 12px; color: rgba(250,250,250,0.75); line-height: 1.15;}
+.menu-awi .subscores {margin-top: 2px; font-size: 12px; color: color-mix(in srgb, currentColor 75%, transparent); line-height: 1.15;}
 .menu-awi .subscore {display:block;}
-.menu-awi .label {font-size: 18px; font-weight: 800; color: rgba(250,250,250,0.90); line-height: 1.15;}
-.live-badge {color: #ff5a52; font-weight: 700; font-size: 13px; margin-top: 2px;}
-.live-time {color: #ff5a52; font-size: 13px; line-height: 1.1; margin-top: 2px;}
+.menu-awi .label {font-size: 18px; font-weight: 800; color: color-mix(in srgb, currentColor 90%, transparent); line-height: 1.15;}
+.live-badge {color: #e0403b; font-weight: 700; font-size: 13px; margin-top: 2px;}
+.live-time {color: #e0403b; font-size: 13px; line-height: 1.1; margin-top: 2px;}
 .menu-teams {flex: 1; display:flex; align-items:center; gap:10px; min-width: 240px;}
 .menu-teams .team {display:flex; align-items:center; gap:8px; min-width: 0;}
 .menu-teams img {width: 28px; height: 28px;}
@@ -71,14 +74,14 @@ div[data-testid="collapsedControl"] {display: none;}
 .menu-matchup {flex: 1; min-width: 0; display:flex; flex-direction: column; gap: 2px;}
 .menu-matchup .teamline {display:flex; align-items:center; gap:8px; min-width: 0; flex-wrap: wrap; row-gap: 2px;}
 .menu-matchup img {width: 34px; height: 34px;}
-.menu-matchup .name {flex: 1 1 auto; min-width: 0; font-size: 16px; font-weight: 800; color: rgba(250,250,250,0.90); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.menu-matchup .name {flex: 1 1 auto; min-width: 0; font-size: 16px; font-weight: 800; color: color-mix(in srgb, currentColor 90%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .menu-matchup .name-full {display: inline;}
 .menu-matchup .name-short {display: none;}
-.menu-matchup .record {flex: 0 0 auto; font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.65); white-space: nowrap;}
-.menu-matchup .record-inline {font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.65); white-space: nowrap; margin-left: 6px;}
-.menu-matchup .sep {font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.35); white-space: nowrap;}
-.menu-matchup .health {font-size: 11px; font-weight: 600; color: rgba(250,250,250,0.65); white-space: nowrap;}
-.menu-matchup .health[data-tooltip] {cursor: pointer; text-decoration: underline dotted rgba(250,250,250,0.35); position: relative;}
+.menu-matchup .record {flex: 0 0 auto; font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap;}
+.menu-matchup .record-inline {font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap; margin-left: 6px;}
+.menu-matchup .sep {font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 35%, transparent); white-space: nowrap;}
+.menu-matchup .health {font-size: 11px; font-weight: 600; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap;}
+.menu-matchup .health[data-tooltip] {cursor: pointer; text-decoration: underline dotted color-mix(in srgb, currentColor 35%, transparent); position: relative;}
 .menu-matchup .health[data-tooltip]:hover::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -87,10 +90,10 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 320px;
   white-space: normal;
-  background: rgba(26,29,36,0.98);
-  color: rgba(250,250,250,0.95);
+  background: #262730;
+  color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   padding: 8px 10px;
   border-radius: 8px;
   font-weight: 500;
@@ -103,15 +106,15 @@ div[data-testid="collapsedControl"] {display: none;}
   top: 110%;
   border-width: 6px;
   border-style: solid;
-  border-color: transparent transparent rgba(250,250,250,0.20) transparent;
+  border-color: transparent transparent color-mix(in srgb, currentColor 20%, transparent) transparent;
 }
-.menu-meta {width: 240px; font-size: 13px; color: rgba(250,250,250,0.75); line-height: 1.3;}
+.menu-meta {width: 240px; font-size: 13px; color: color-mix(in srgb, currentColor 75%, transparent); line-height: 1.3;}
 .menu-meta div {margin: 1px 0;}
 
 /* Matchup badges (key injuries) */
 .matchup-badges {display:flex; flex-wrap: wrap; gap: 6px; margin-left: 42px; margin-top: 2px;}
-.badge {display:inline-flex; align-items:center; border: 1px solid rgba(250,250,250,0.20); border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 750; color: rgba(250,250,250,0.75); background: rgba(26,29,36,0.95);}
-.badge[data-tooltip] {cursor: pointer; text-decoration: underline dotted rgba(250,250,250,0.35); position: relative;}
+.badge {display:inline-flex; align-items:center; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 750; color: color-mix(in srgb, currentColor 75%, transparent); background: color-mix(in srgb, currentColor 4%, transparent);}
+.badge[data-tooltip] {cursor: pointer; text-decoration: underline dotted color-mix(in srgb, currentColor 35%, transparent); position: relative;}
 .badge[data-tooltip]:hover::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -120,10 +123,10 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 340px;
   white-space: pre-line;
-  background: rgba(26,29,36,0.98);
-  color: rgba(250,250,250,0.95);
+  background: #262730;
+  color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   padding: 8px 10px;
   border-radius: 8px;
   font-weight: 500;
@@ -136,29 +139,29 @@ div[data-testid="collapsedControl"] {display: none;}
   top: 110%;
   border-width: 6px;
   border-style: solid;
-  border-color: transparent transparent rgba(250,250,250,0.20) transparent;
+  border-color: transparent transparent color-mix(in srgb, currentColor 20%, transparent) transparent;
 }
 
 /* Recommendations module */
 .rec-wrap {margin-bottom: 10px;}
-.rec-head {font-size: 22px; font-weight: 1000; color: rgba(250,250,250,0.92); letter-spacing: 0.2px; margin-bottom: 8px; margin-top: 68px;}
-.rec-card {border-left: 3px solid #e0403b; border: 1px solid rgba(250,250,250,0.15); border-radius: 14px; padding: 12px 12px; background: rgba(26,29,36,0.92); box-shadow: 0 8px 22px rgba(0,0,0,0.35); margin-bottom: 10px;}
-.rec-title {font-size: 20px; font-weight: 900; color: rgba(250,250,250,0.90); line-height: 1.1;}
-.rec-title.now {color: #ff5a52;}
+.rec-head {font-size: 22px; font-weight: 1000; color: color-mix(in srgb, currentColor 92%, transparent); letter-spacing: 0.2px; margin-bottom: 8px; margin-top: 68px;}
+.rec-card {border: 1px solid color-mix(in srgb, currentColor 15%, transparent); border-left: 3px solid #e0403b; border-radius: 14px; padding: 12px 12px; background: color-mix(in srgb, currentColor 4%, transparent); box-shadow: 0 6px 18px rgba(0,0,0,0.12); margin-bottom: 10px;}
+.rec-title {font-size: 20px; font-weight: 900; color: color-mix(in srgb, currentColor 90%, transparent); line-height: 1.1;}
+.rec-title.now {color: #e0403b;}
 .rec-title.upcoming {color: #e0403b;}
-.rec-sub {margin-top: 2px; font-size: 18px; font-weight: 900; color: rgba(250,250,250,0.92); line-height: 1.1;}
+.rec-sub {margin-top: 2px; font-size: 18px; font-weight: 900; color: color-mix(in srgb, currentColor 92%, transparent); line-height: 1.1;}
 .rec-row {margin-top: 8px; display:flex; align-items:center; gap:10px;}
 .rec-teams {flex:1; display:flex; flex-direction: column; gap:6px; min-width: 0;}
 .rec-teamline {display:flex; align-items:center; gap:8px; min-width: 0; flex-wrap: wrap; row-gap: 2px;}
 .rec-teamline img {width: 34px; height: 34px;}
-.rec-teamline .name {flex: 1 1 auto; min-width: 0; font-size: 16px; font-weight: 800; color: rgba(250,250,250,0.90); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.rec-teamline .name {flex: 1 1 auto; min-width: 0; font-size: 16px; font-weight: 800; color: color-mix(in srgb, currentColor 90%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .rec-teamline .name-full {display: inline;}
 .rec-teamline .name-short {display: none;}
-.rec-teamline .record {flex: 0 0 auto; font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.65); white-space: nowrap;}
-.rec-teamline .record-inline {font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.65); white-space: nowrap; margin-left: 6px;}
-.rec-teamline .sep {font-size: 11px; font-weight: 400; color: rgba(250,250,250,0.35); white-space: nowrap;}
-.rec-teamline .health {font-size: 11px; font-weight: 600; color: rgba(250,250,250,0.65); white-space: nowrap;}
-.rec-teamline .health[data-tooltip] {cursor: pointer; text-decoration: underline dotted rgba(250,250,250,0.35); position: relative;}
+.rec-teamline .record {flex: 0 0 auto; font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap;}
+.rec-teamline .record-inline {font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap; margin-left: 6px;}
+.rec-teamline .sep {font-size: 11px; font-weight: 400; color: color-mix(in srgb, currentColor 35%, transparent); white-space: nowrap;}
+.rec-teamline .health {font-size: 11px; font-weight: 600; color: color-mix(in srgb, currentColor 65%, transparent); white-space: nowrap;}
+.rec-teamline .health[data-tooltip] {cursor: pointer; text-decoration: underline dotted color-mix(in srgb, currentColor 35%, transparent); position: relative;}
 .rec-teamline .health[data-tooltip]:hover::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -167,10 +170,10 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   max-width: 320px;
   white-space: normal;
-  background: rgba(26,29,36,0.98);
-  color: rgba(250,250,250,0.95);
+  background: #262730;
+  color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   padding: 8px 10px;
   border-radius: 8px;
   font-weight: 500;
@@ -183,19 +186,19 @@ div[data-testid="collapsedControl"] {display: none;}
   top: 110%;
   border-width: 6px;
   border-style: solid;
-  border-color: transparent transparent rgba(250,250,250,0.20) transparent;
+  border-color: transparent transparent color-mix(in srgb, currentColor 20%, transparent) transparent;
 }
 .rec-meta {display:flex; flex-direction: column; align-items: flex-end; gap:6px;}
-.chip {display:inline-flex; align-items:center; justify-content:center; border: 1px solid rgba(250,250,250,0.20); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; color: rgba(250,250,250,0.80); background: rgba(26,29,36,0.95);}
-.chip a {color: rgba(250,250,250,0.85); text-decoration: none;}
-.rec-live {font-size: 12px; font-weight: 900; color: #ff5a52;}
-.rec-score {font-size: 12px; font-weight: 900; color: #ff5a52; margin-top: -2px;}
-.rec-wi {font-size: 12px; font-weight: 800; color: rgba(250,250,250,0.78);}
-.rec-tip {font-weight: 850; color: rgba(250,250,250,0.82);}
+.chip {display:inline-flex; align-items:center; justify-content:center; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; color: color-mix(in srgb, currentColor 80%, transparent); background: color-mix(in srgb, currentColor 4%, transparent);}
+.chip a {color: inherit; text-decoration: none;}
+.rec-live {font-size: 12px; font-weight: 900; color: #e0403b;}
+.rec-score {font-size: 12px; font-weight: 900; color: #e0403b; margin-top: -2px;}
+.rec-wi {font-size: 12px; font-weight: 800; color: color-mix(in srgb, currentColor 78%, transparent);}
+.rec-tip {font-weight: 850; color: color-mix(in srgb, currentColor 82%, transparent);}
 .rec-menu-row {padding-top: 10px; padding-bottom: 10px;}
-.rec-menu-row + .rec-menu-row {border-top: 1px solid rgba(250,250,250,0.12);}
+.rec-menu-row + .rec-menu-row {border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);}
 .day-rank-row {padding: 10px 0;}
-.day-rank-row + .day-rank-row {border-top: 1px solid rgba(250,250,250,0.12);}
+.day-rank-row + .day-rank-row {border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);}
 .day-rank-day {line-height: 1.2;}
 .day-rank-chip {
   display: inline-flex;
@@ -209,17 +212,17 @@ div[data-testid="collapsedControl"] {display: none;}
   background: rgba(224,64,59,0.08);
   text-decoration: none;
 }
-.rec-card a.day-rank-chip, .rec-card a.day-rank-chip:visited {color: #ffa39c; text-decoration: none;}
+.rec-card a.day-rank-chip, .rec-card a.day-rank-chip:visited {color: #e0403b; text-decoration: none;}
 .day-rank-chip:hover {
   background: rgba(224,64,59,0.14);
   border-color: rgba(224,64,59,0.45);
 }
-.day-rank-count {margin-top: 2px; font-size: 13px; font-weight: 700; color: rgba(250,250,250,0.72); line-height: 1.2;}
+.day-rank-count {margin-top: 2px; font-size: 13px; font-weight: 700; color: color-mix(in srgb, currentColor 72%, transparent); line-height: 1.2;}
 /* Small "info" hover icon next to the dashboard caption. */
-.info-icon {display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 999px; border: 1px solid rgba(250,250,250,0.25); color: rgba(250,250,250,0.8); font-size: 13px; font-weight: 700;}
+.info-icon {display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); color: color-mix(in srgb, currentColor 80%, transparent); font-size: 13px; font-weight: 700;}
 .info-icon[data-tooltip] {cursor: pointer; position: relative;}
 .caption-row {display: inline-flex; align-items: center; gap: 10px;}
-.caption-text {color: rgba(250,250,250,0.6); font-size: 0.9rem; line-height: 1.25;}
+.caption-text {color: color-mix(in srgb, currentColor 60%, transparent); font-size: 0.9rem; line-height: 1.25;}
 .caption-spacer {height: 14px;}
 .info-icon[data-tooltip]:hover::after {
   content: attr(data-tooltip);
@@ -229,10 +232,10 @@ div[data-testid="collapsedControl"] {display: none;}
   z-index: 9999;
   width: 340px;
   white-space: pre-line;
-  background: rgba(26,29,36,0.98);
-  color: rgba(250,250,250,0.95);
+  background: #262730;
+  color: #fafafa;
   border: 1px solid rgba(250,250,250,0.20);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   padding: 10px 12px;
   border-radius: 10px;
   font-weight: 500;
@@ -245,13 +248,13 @@ div[data-testid="collapsedControl"] {display: none;}
   top: 115%;
   border-width: 6px;
   border-style: solid;
-  border-color: transparent transparent rgba(250,250,250,0.20) transparent;
+  border-color: transparent transparent color-mix(in srgb, currentColor 20%, transparent) transparent;
 }
 
 /* Sunday window headers in the game list */
 .window-head {display:flex; align-items:baseline; gap:10px; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #e0403b;}
-.window-name {font-size: 17px; font-weight: 900; color: rgba(250,250,250,0.95);}
-.window-meta {font-size: 13px; font-weight: 600; color: rgba(250,250,250,0.60);}
+.window-name {font-size: 17px; font-weight: 900; color: color-mix(in srgb, currentColor 95%, transparent);}
+.window-meta {font-size: 13px; font-weight: 600; color: color-mix(in srgb, currentColor 60%, transparent);}
 
 /* Mobile layout: prevent overlap by stacking meta below matchup. */
 @media (max-width: 640px) {
@@ -279,15 +282,15 @@ div[data-testid="collapsedControl"] {display: none;}
   gap: 0;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(250, 250, 250, 0.18);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   width: fit-content;
-  background: rgba(26, 29, 36, 0.96);
+  background: color-mix(in srgb, currentColor 4%, transparent);
 }
 [data-testid="stSegmentedControl"] [role="radiogroup"] label {
   min-height: 36px;
   padding: 0 18px;
   border: 0;
-  border-right: 1px solid rgba(250, 250, 250, 0.18);
+  border-right: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 0;
   background: transparent;
 }
@@ -948,10 +951,9 @@ def render_chart(
             )
     regions_df = pd.DataFrame(cells)
 
-    regions_other = (
+    regions = (
         alt.Chart(regions_df)
-        .transform_filter(alt.datum.Region != "Hard Skip")
-        .mark_rect(opacity=0.22)
+        .mark_rect(opacity=0.45)
         .encode(
             x=alt.X("q:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
             x2="q2:Q",
@@ -967,21 +969,6 @@ def render_chart(
         )
     )
 
-    regions_bad = (
-        alt.Chart(regions_df)
-        .transform_filter(alt.datum.Region == "Hard Skip")
-        .mark_rect(opacity=0.30, color=region_colors["Hard Skip"])
-        .encode(
-            x=alt.X("q:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
-            x2="q2:Q",
-            y=alt.Y("c:Q", scale=alt.Scale(domain=[CLOSENESS_FLOOR, 1.0]), axis=None),
-            y2="c2:Q",
-            tooltip=[],
-        )
-    )
-
-    regions = regions_other + regions_bad
-
     axes = alt.Chart(df_plot).mark_point(opacity=0).encode(
         x=alt.X(
             "Team Quality:Q",
@@ -989,11 +976,9 @@ def render_chart(
             axis=alt.Axis(
                 title="Team Quality",
                 format=".2f",
-                titleColor="rgba(250,250,250,0.9)",
                 titleFontSize=18,
                 titleFontWeight="bold",
                 titlePadding=28,
-                labelColor="rgba(250,250,250,0.65)",
                 labelFontSize=12,
             ),
         ),
@@ -1003,11 +988,9 @@ def render_chart(
             axis=alt.Axis(
                 title="Competitiveness",
                 format=".2f",
-                titleColor="rgba(250,250,250,0.9)",
                 titleFontSize=18,
                 titleFontWeight="bold",
                 titlePadding=34,
-                labelColor="rgba(250,250,250,0.65)",
                 labelFontSize=12,
             ),
         ),
@@ -1027,7 +1010,7 @@ def render_chart(
         fontSize=region_label_font_size,
         fontWeight=700,
         opacity=0.2,
-        color="rgba(250,250,250,0.75)",
+        color=CHART_INK,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
         y=alt.Y("y:Q", scale=alt.Scale(domain=[CLOSENESS_FLOOR, 1.0]), axis=None),
@@ -1044,7 +1027,7 @@ def render_chart(
         fontSize=axis_label_font_size,
         fontWeight=800,
         opacity=0.95,
-        color="rgba(250,250,250,0.9)",
+        color=CHART_INK,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
         y=alt.Y("y:Q", scale=alt.Scale(domain=[CLOSENESS_FLOOR, 1.0]), axis=None),
@@ -1060,7 +1043,7 @@ def render_chart(
         fontSize=axis_sublabel_font_size,
         fontWeight=500,
         opacity=0.95,
-        color="rgba(250,250,250,0.9)",
+        color=CHART_INK,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
         y=alt.Y("y:Q", scale=alt.Scale(domain=[CLOSENESS_FLOOR, 1.0]), axis=None),
@@ -1079,7 +1062,7 @@ def render_chart(
         fontSize=axis_label_font_size,
         fontWeight=800,
         opacity=0.95,
-        color="rgba(250,250,250,0.9)",
+        color=CHART_INK,
         angle=270,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
@@ -1097,7 +1080,7 @@ def render_chart(
         fontSize=axis_sublabel_font_size,
         fontWeight=500,
         opacity=0.95,
-        color="rgba(250,250,250,0.9)",
+        color=CHART_INK,
         angle=270,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
@@ -1199,7 +1182,7 @@ def render_chart(
     tips = alt.Chart(df_plot).mark_text(
         dy=tips_dy,
         fontSize=tip_font_size,
-        color="rgba(250,250,250,0.75)",
+        color=CHART_INK,
     ).encode(
         x=alt.X("Team quality:Q", axis=None),
         y=alt.Y("Closeness:Q", axis=None),
@@ -1218,7 +1201,7 @@ def render_chart(
         baseline="top",
         fontSize=legend_font_size,
         fontWeight=700,
-        color="rgba(250,250,250,0.70)",
+        color=CHART_INK,
         opacity=0.95,
     ).encode(
         x=alt.X("x:Q", scale=alt.Scale(domain=[QUALITY_FLOOR, 1.0]), axis=None),
@@ -1245,7 +1228,7 @@ def render_chart(
             anchor="middle",
             fontSize=chart_title_font_size,
             fontWeight=800,
-            color="rgba(250,250,250,0.9)",
+            color=CHART_INK,
             dy=4,
         ),
     )

@@ -1,5 +1,12 @@
-[theme]
-base = "dark"
+# Light and dark palettes. The app follows the viewer's system setting;
+# viewers can switch in the top-right menu (⋮ → Settings → Theme).
+[theme.light]
+primaryColor = "#C8322D"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F4F6"
+textColor = "#1F2229"
+
+[theme.dark]
 primaryColor = "#E0403B"
 backgroundColor = "#0E1117"
 secondaryBackgroundColor = "#1A1D24"

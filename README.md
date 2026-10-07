@@ -25,7 +25,7 @@ You don't need an API key. Games, DraftKings spreads, standings, injuries and de
 | Clock | 12-min quarters | 15-min quarters |
 | Forecast / X bot | 7-day model forecast, tweet bot | Removed (ESPN already lists the full week with lines) |
 | Times | Pacific | Eastern; Sunday games grouped by window (morning / early / late / night) |
-| Theme | Light | Dark with red accents (`.streamlit/config.toml`) |
+| Theme | Light | Light + dark with red accents; follows the system setting, switchable in ⋮ → Settings (`.streamlit/config.toml`) |
 
 The CES formula in `core/watchability.py` (70% quality, 30% closeness) is unchanged.
 
