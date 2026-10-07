@@ -24,3 +24,7 @@ output/
 output/logs/
 output/**/*.csv
 output/**/*.parquet
+
+# Streamlit secrets
+.streamlit/secrets.toml
+**/.streamlit/secrets.toml
